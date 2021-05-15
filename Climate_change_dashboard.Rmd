@@ -1,6 +1,6 @@
 ---
-title: "LAB2_ANLY512"
-author: "Ruchil Barya, Komal Bhagat"
+title: "Climate Change Dashboard"
+author: "Ruchil Barya"
 output:
   flexdashboard::flex_dashboard:
     orientation: columns
