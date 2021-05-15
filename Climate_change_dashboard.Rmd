@@ -1,0 +1,178 @@
+---
+title: "LAB2_ANLY512"
+author: "Ruchil Barya, Komal Bhagat"
+output:
+  flexdashboard::flex_dashboard:
+    orientation: columns
+    vertical_layout: fill
+    source_code: embed
+---
+
+```{r setup, include=FALSE}
+library(flexdashboard)
+knitr::opts_chunk$set(echo = TRUE)
+library(maps)
+library(readr)
+library(plotly)
+library(dygraphs)
+library(ggplot2)
+library(lubridate)
+library(mapproj)
+library(readxl)
+```
+
+
+Global Climate
+=======================================================================
+
+
+Column {.tabset data-width=500}
+-----------------------------------------------------------------------
+### Global Temperature
+History of Global Surface Temperature since 2000
+```{r,echo = FALSE, warning=FALSE}
+# get data
+gmt = read.table("https://climate.nasa.gov/system/internal_resources/details/original/647_Global_Temperature_Data_File.txt", header = FALSE, col.names = c("Year","Annual_Mean","Five_Year_Mean"),skip = 5)
+
+# reformat date 
+gmt[,3] = as.numeric(as.character(gmt[,3]))
+scaled_gmt = gmt
+scaled_gmt[,2] = scale(gmt$Annual_Mean)
+scaled_gmt[,3] = scale(gmt$Five_Year_Mean)
+scaled_gmt_time_series = ts(scaled_gmt$Five_Year_Mean, frequency = 1, start=c(2000))
+
+# plot
+dygraph(scaled_gmt_time_series, main = " Mean Temperature Anomalies", xlab = "Year", ylab=" 5-Year Mean Temperature Anomaly")
+
+```
+
+
+### Global Sea Level
+History of Global Sea Level since 1993
+```{r, echo = FALSE, message = FALSE}
+
+gmsl <- read.table("http://sealevel.colorado.edu/files/2018_rel1/sl_ns_global.txt")
+colnames(gmsl) <- c("year", "msl")
+
+gmsl$datetime <- date_decimal(gmsl$year)
+gmsl$date <- as.Date(format(gmsl$datetime, "%Y-%m-%d"), format = "%Y-%m-%d")
+
+
+ggplot(gmsl, aes(date, msl)) +  
+    geom_line(color = "pink") +
+    geom_point(color = "red", size = 1) +
+    stat_smooth(span = 0.2) +   
+    stat_smooth(method = "lm") +    
+    xlab("Year") +
+    ylab(expression(paste(Delta, " MSL (mm)"))) +
+    ggtitle("Global Mean Sea Level") +
+    theme_bw()
+```
+
+### Atmospheric Carbon Dioxide
+History of Atmospheric Carbon Dioxide from year 2000
+```{r, echo = FALSE, message = FALSE}
+# get data
+acd = read.table("ftp://aftp.cmdl.noaa.gov/products/trends/co2/co2_mm_mlo.txt", header = FALSE, col.names = c("Year","Month","Decimal_Date","Average","Interpolated","Trend","Days"))
+
+
+# reformat date
+acd$Average = replace(acd$Average, acd$Average == -99.99, NA)
+acd$Days = replace(acd$Days, acd$Days == -1, NA)
+scaled_acd = acd
+scaled_acd$Interpolated = scale(acd$Interpolated)
+scaled_acd_time_series = ts(scaled_acd$Interpolated, frequency = 12, start = c(1980,3))
+
+# plot
+dygraph(scaled_acd_time_series, main = "Monthly Mean Atmospheric Carbon Dioxide Levels", xlab = "Year", ylab=" Mean Atmospheric Carbon Dioxide LevelZ")
+```
+
+Column {.tabset data-width=500}
+------------------------------------------------
+### **Climate Change Dashboard**
+
+Climate change and its effects are accelerating and are one of the major concerns in the worldwide. According to recent research, it has been estimated that people will have to adapt to this dramatic change in climate by 2080, because of global warming.
+
+To illustrate the climate change within specific periods, this dashboard provides data exploration and analysis of global surface average temperature, global mean sea level(mm), and carbon dioxide(ppm).
+
+Moreover, the dashboard will anticipate the United State's Statewide Average Temperature and graphical visualization of climate change in various years.
+
+
+Data Source: [Global Temperature](http://climate.nasa.gov/system/internal_resources/details/original/647_Global_Temperature_Data_File.txt), [Global Mean Sea Level](http://sealevel.colorado.edu/files/2018_rel1/sl_ns_global.txt), [Atmospheric Carbon Dioxide](ftp://aftp.cmdl.noaa.gov/products/trends/co2/co2_mm_mlo.txt), [Statewide Average Temperature](https://www.ncdc.noaa.gov/cag/statewide/mapping/110-tavg-201901-1.csv)
+
+
+
+US Statewise Temperature
+=======================================================================
+Row {.tabset data-width=600}
+-----------------------------------------------------------------------
+### June 2020 Contiguous U.S. Statewise Average Temperature {.no-padding}
+
+```{r, echo = FALSE, message = FALSE, fig.width=12}
+# get data
+
+state_avg_temp <- read_csv("110-tavg-202006-1.csv")
+# reformat date
+states = map_data("state")  
+state_avg_temp$region = tolower(state_avg_temp$Location)
+states = merge(states, state_avg_temp, by="region", all.x=T)
+
+h <- ggplot(states, aes(x = long, y = lat, fill = Value))+
+  geom_polygon(color = "white")
+h <- h + scale_fill_gradient(name = "degrees F", low = "#feceda", high = "#c81f49", guide = "colorbar", na.value="black") 
+h <- h + labs(title="June 2020 Statewide Average Temperature") + coord_map() 
+
+# plot
+ggplotly(h, height = 700, width = 750)
+```
+
+### June 2020 Mean Value
+
+```{r, echo = FALSE, message = FALSE,message = FALSE}
+Max_temp_g=ggplot(state_avg_temp, aes(x = reorder(Location,-Value), y = Value)) + 
+  geom_bar(aes(fill=Location),stat="identity",width = 0.9, 
+           position = position_dodge(1.0)) + theme_minimal() + 
+  xlab("State") + ylab("Mean Temp (degrees F)") +
+  theme(axis.text.x=element_blank(),
+      axis.ticks.x=element_blank(),
+      plot.background = element_blank()) + 
+  ggtitle("Bar Chart of Mean Temp, june 2020")
+ggplotly(Max_temp_g)
+```
+
+
+Column {.tabset data-width=600}
+-----------------------------------------------------------------------
+
+### June 2020 Statewise Average Temperature Anomaly
+
+```{r,echo = FALSE, message = FALSE,fig.width=12}
+p <- ggplot(states, aes(x = long, y = lat, fill = Anomaly))+
+  geom_polygon(color = "white")
+p <- p + scale_fill_gradient(name = "Anomaly", low = "#33ff99", high = "#339999", guide = "colorbar", na.value="black") 
+p <- p + labs(title="Statewise Average Temperature Anomaly") + coord_map() 
+ggplotly(p,height = 700, width = 750)
+```
+
+### June 2020 Anomaly (1901-2000 base period)
+
+```{r,echo = FALSE, message = FALSE}
+Min_temp_g=ggplot(state_avg_temp, aes(x = reorder(Location,-Anomaly), y = Anomaly)) + 
+  geom_bar(aes(fill=Location),stat="identity",width = 0.9, 
+           position = position_dodge(1.0)) + theme_minimal() + 
+  xlab("State") + ylab("Mean Temp (degrees F)") +
+  theme(axis.text.x=element_blank(),
+      axis.ticks.x=element_blank(),
+      plot.background = element_blank()) + 
+  ggtitle("Bar Chart of Anomaly based 1901-2000")
+ggplotly(Min_temp_g)
+```
+
+Observation
+==============================
+
+The global surface temperature is increasing rapidly, and global sea-level rise has accelerated from 2.6 inches from the year 1993-2014. We also see an increase of 1.71F in the global temperature, making 2019 as the second warmest year till now. Moreover, the amount of carbon dioxide in the atmosphere has increased by 11.33% from the year 2000 to 2020. Currently, the carbon dioxide levels are way higher than in past years which is one of the main causes of global warming and an increase in the earth's temperature.
+
+For the US statewide average, we can see Florida has the highest average temperature in June 2020, which is 80.0F, while Idaho has the lowest average temperature in June 2020, which is 56.1F.
+
+Temperature anomaly means a departure from a reference value or long-term average. A positive anomaly indicates that the observed temperature was warmer than the reference value, while a negative anomaly indicates that the observed temperature was colder than the reference value. As shown in our analysis, Nebraska has the highest increase in the statewide temperature anomaly (5.1). On the other hand, Idaho showed a minimum change in statewide temperature anomaly (-0.6).
